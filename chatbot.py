@@ -1,21 +1,22 @@
-from chatterbot import ChatBot
-from chatterbot.trainers import ListTrainer
+from flask import Flask, render_template, request, jsonify
 from requests import get
 from bs4 import BeautifulSoup
+import yaml
 import os
-from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
-bot= ChatBot('ChatBot')
+# Load responses from YAML file
+def load_responses():
+    try:
+        with open('data/responses.yml', 'r') as file:
+            responses = yaml.safe_load(file)
+            return {key.lower(): value for key, value in responses.items()}  # Ensure keys are lowercase
+    except Exception as e:
+        print(f"Error loading YAML file: {e}")
+        return {}
 
-trainer = ListTrainer(bot)
-
-for file in os.listdir('data'):
-
-    chats = open('data' + file, 'r').readlines()
-
-    trainer.train(chats)
+responses = load_responses()
 
 @app.route("/")
 def hello():
@@ -23,43 +24,31 @@ def hello():
 
 @app.route("/ask", methods=['POST'])
 def ask():
+    message = str(request.form['messageText']).lower()
 
-    message = str(request.form['messageText'])
+    # Check for predefined responses in YAML file
+    if message in responses:
+        bot_response = responses[message]
+        return jsonify({'status': 'OK', 'answer': bot_response})
 
-    bot_response = bot.get_response(message)
+    # If no predefined response, try fetching from Wikipedia
+    try:
+        url = f"https://en.wikipedia.org/wiki/{message.replace(' ', '_')}"
+        page = get(url).text
+        soup = BeautifulSoup(page, "html.parser")
+        paragraphs = soup.find_all("p")
 
-    while True:
+        # Return the first paragraph with content
+        for p in paragraphs:
+            if p.text.strip():
+                return jsonify({'status': 'OK', 'answer': p.text.strip()})
 
-        if bot_response.confidence > 0.1:
+    except Exception as error:
+        print(f"Error fetching from Wikipedia: {error}")
 
-            bot_response = str(bot_response)      
-            print(bot_response)
-            return jsonify({'status':'OK','answer':bot_response})
- 
-        elif message == ("bye"):
-
-            bot_response='Hope to see you soon'
-
-            print(bot_response)
-            return jsonify({'status':'OK','answer':bot_response})
-
-            break
-
-        else:
-        
-            try:
-                url  = "https://en.wikipedia.org/wiki/"+ message
-                page = get(url).text
-                soup = BeautifulSoup(page,"html.parser")
-                p    = soup.find_all("p")
-                return jsonify({'status':'OK','answer':p[1].text})
-
-            except IndexError as error:
-
-                bot_response = 'Sorry i have no idea about that.'
-            
-                print(bot_response)
-                return jsonify({'status':'OK','answer':bot_response})
+    # Default response if no match is found
+    bot_response = 'Sorry, I have no idea about that.'
+    return jsonify({'status': 'OK', 'answer': bot_response})
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
