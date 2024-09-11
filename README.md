@@ -18,11 +18,3 @@ ChatMate is a simple web-based chatbot application built using Flask, Bootstrap,
 - **Frontend**: HTML, Bootstrap 5, jQuery, FontAwesome
 - **Web Scraping**: BeautifulSoup, Requests
 
-## Setup and Installation
-
-Follow the steps below to run the ChatMate app locally:
-
-### Prerequisites
-
-- Python 3.x installed
-- Flask and necessary dependencies installed
